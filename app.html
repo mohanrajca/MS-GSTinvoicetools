@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GST Invoice Pro</title>
+  <link rel="stylesheet" href="css/main.css">
+  <!-- SheetJS for Excel export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<!-- ── Sidebar ──────────────────────────────────────────────────────────── -->
+<aside class="sidebar">
+  <div class="sidebar__header">
+    <div class="sidebar__logo">G</div>
+    <span class="sidebar__app-name">GST Invoice Pro</span>
+  </div>
+
+  <nav class="sidebar__nav">
+    <a data-module="dashboard">
+      <span class="nav-icon">⊞</span>
+      <span class="nav-label">Dashboard</span>
+    </a>
+    <a data-module="customers">
+      <span class="nav-icon">👥</span>
+      <span class="nav-label">Customers</span>
+    </a>
+    <a data-module="products">
+      <span class="nav-icon">📦</span>
+      <span class="nav-label">Products</span>
+    </a>
+    <a data-module="invoices">
+      <span class="nav-icon">🧾</span>
+      <span class="nav-label">Invoices</span>
+    </a>
+    <a data-module="sales-register">
+      <span class="nav-icon">📋</span>
+      <span class="nav-label">Sales Register</span>
+    </a>
+    <!-- Commission tracker: only shown for commission-type clients via CSS -->
+    <a data-module="commission-tracker" class="nav-commission">
+      <span class="nav-icon">⚖️</span>
+      <span class="nav-label">Commission Tracker</span>
+    </a>
+    <a data-module="receivables">
+      <span class="nav-icon">💰</span>
+      <span class="nav-label">Accounts &amp; Receivables</span>
+    </a>
+    <a data-module="expenses">
+      <span class="nav-icon">↓</span>
+      <span class="nav-label">Expenses</span>
+    </a>
+    <a data-module="receipts">
+      <span class="nav-icon">🧾</span>
+      <span class="nav-label">Receipts</span>
+    </a>
+    <a data-module="payments">
+      <span class="nav-icon">$</span>
+      <span class="nav-label">Payments</span>
+    </a>
+    <a data-module="settings">
+      <span class="nav-icon">⚙</span>
+      <span class="nav-label">Settings</span>
+    </a>
+  </nav>
+
+  <div class="sidebar__footer">
+    <div class="sidebar__sync-status">
+      <span class="sync-dot" id="syncDot"></span>
+      <span id="syncStatus">Not synced</span>
+    </div>
+    <div class="sidebar__user">
+      <div class="sidebar__user-avatar" id="userAvatar">?</div>
+      <div>
+        <div class="sidebar__user-name" id="sidebarUserName">—</div>
+        <div class="sidebar__user-role" id="sidebarUserRole">—</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- ── Main area ─────────────────────────────────────────────────────────── -->
+<div class="main-area">
+
+  <!-- Top bar -->
+  <header class="topbar">
+    <div>
+      <div class="topbar__title" id="topbar-title">Dashboard</div>
+      <div class="topbar__subtitle" id="topbar-subtitle" id="clientNameDisplay"></div>
+    </div>
+    <div class="topbar__right">
+      <select class="fy-selector" id="fySelector"></select>
+      <button class="btn btn--outline" id="syncBtn">↻ Sync Now</button>
+      <button class="btn btn--primary" id="newInvoiceBtn">+ New Invoice</button>
+      <button class="btn btn--outline btn--sm" id="logoutBtn" title="Sign out">⏻</button>
+    </div>
+  </header>
+
+  <!-- Module content area -->
+  <main id="main-content">
+    <div class="loading-spinner">
+      <div class="spinner"></div> Loading…
+    </div>
+  </main>
+
+</div><!-- /main-area -->
+
+<!-- ── Scripts ───────────────────────────────────────────────────────────── -->
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/api.js"></script>
+<script src="js/router.js"></script>
+<!-- Modules -->
+<script src="js/modules/dashboard.js"></script>
+<script src="js/modules/customers.js"></script>
+<script src="js/modules/products.js"></script>
+<script src="js/modules/invoices.js"></script>
+<script src="js/modules/sales-register.js"></script>
+<script src="js/modules/commission-tracker.js"></script>
+<script src="js/modules/receivables.js"></script>
+<script src="js/modules/expenses.js"></script>
+<script src="js/modules/receipts.js"></script>
+<script src="js/modules/payments.js"></script>
+<script src="js/modules/settings.js"></script>
+<!-- Invoice format engine -->
+<script src="js/invoice-format.js"></script>
+<!-- Export engine -->
+<script src="js/export/excel-export.js"></script>
+<script src="js/export/json-export.js"></script>
+<script src="js/export/gstr1-export.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+
+  // ── Session guard ─────────────────────────────────────────────────────────
+  await api.refreshSession();
+  const session = auth.getSession();
+  if (!session) return; // refreshSession will have redirected
+
+  // ── Apply session flags to <body> for CSS-driven feature gating ───────────
+  if (!session.gstRegistered)              document.body.classList.add('no-gst');
+  if (session.invoiceType === 'commission') document.body.classList.add('invoice-commission');
+
+  // ── Populate UI from session ──────────────────────────────────────────────
+  document.getElementById('topbar-subtitle').textContent = session.clientName || '';
+  document.getElementById('sidebarUserName').textContent = session.userName || '';
+  document.getElementById('sidebarUserRole').textContent = session.role || '';
+  const initials = (session.userName || '?').slice(0,2).toUpperCase();
+  document.getElementById('userAvatar').textContent = initials;
+
+  // ── Build FY dropdown ─────────────────────────────────────────────────────
+  router.buildFYOptions();
+
+  // ── Sidebar nav click handler ─────────────────────────────────────────────
+  document.querySelectorAll('.sidebar__nav a[data-module]').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      router.loadModule(a.dataset.module);
+    });
+  });
+
+  // ── FY change → reload current module ────────────────────────────────────
+  document.getElementById('fySelector').addEventListener('change', () => {
+    if (window._currentModule) router.loadModule(window._currentModule);
+  });
+
+  // ── Sync Now ──────────────────────────────────────────────────────────────
+  document.getElementById('syncBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('syncBtn');
+    btn.disabled = true;
+    btn.textContent = '↻ Syncing…';
+    try {
+      await api.callClientScript('sync', {});
+      document.getElementById('syncDot').classList.add('synced');
+      document.getElementById('syncStatus').textContent =
+        'Synced ' + new Date().toLocaleTimeString();
+      api.showToast('Synced successfully');
+      if (window._currentModule) router.loadModule(window._currentModule);
+    } catch {
+      api.showToast('Sync failed — check connection', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '↻ Sync Now';
+    }
+  });
+
+  // ── New Invoice button ────────────────────────────────────────────────────
+  document.getElementById('newInvoiceBtn').addEventListener('click', () => {
+    router.loadModule('invoices');
+    // Module will open new-invoice form; signal via event
+    setTimeout(() => document.dispatchEvent(new CustomEvent('openNewInvoice')), 100);
+  });
+
+  // ── Logout ────────────────────────────────────────────────────────────────
+  document.getElementById('logoutBtn').addEventListener('click', () => {
+    if (confirm('Sign out?')) auth.logout();
+  });
+
+  // ── Load dashboard ────────────────────────────────────────────────────────
+  router.loadModule('dashboard');
+});
+</script>
+</body>
+</html>

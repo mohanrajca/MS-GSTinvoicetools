@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GST Invoice Pro — Sign In</title>
+  <link rel="stylesheet" href="css/login.css">
+</head>
+<body>
+
+<div class="login-wrapper">
+
+  <div class="login-brand">
+    <div class="login-brand__logo">G</div>
+    <div class="login-brand__app-name">GST Invoice Pro</div>
+    <div class="login-brand__firm-name">MS Associates · Coimbatore</div>
+  </div>
+
+  <div class="login-card">
+    <div class="login-card__title">Sign in to your account</div>
+
+    <div class="form-group">
+      <label for="username">Username</label>
+      <input type="text" id="username" autocomplete="username"
+             placeholder="Enter username" autofocus>
+    </div>
+
+    <div class="form-group">
+      <label for="password">Password</label>
+      <input type="password" id="password" autocomplete="current-password"
+             placeholder="Enter password">
+    </div>
+
+    <button class="btn-login" id="loginBtn">Sign In</button>
+
+    <div class="login-error" id="errorMsg"></div>
+  </div>
+
+  <div class="login-footer">
+    &copy; 2026 MS Associates · Practising Company Secretaries
+  </div>
+
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/api.js"></script>
+<script>
+  // ── Redirect if already logged in ────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    const session = auth.getSession();
+    if (session) {
+      window.location.href = session.role === 'superadmin' ? 'admin.html' : 'app.html';
+      return;
+    }
+
+    // ── Login handler ───────────────────────────────────────────────────────
+    const loginBtn  = document.getElementById('loginBtn');
+    const usernameEl = document.getElementById('username');
+    const passwordEl = document.getElementById('password');
+    const errorMsg  = document.getElementById('errorMsg');
+
+    function showError(msg) {
+      errorMsg.textContent = msg;
+      errorMsg.classList.add('visible');
+    }
+    function hideError() {
+      errorMsg.classList.remove('visible');
+    }
+
+    async function handleLogin() {
+      const username = usernameEl.value.trim();
+      const password = passwordEl.value;
+
+      if (!username || !password) {
+        showError('Please enter your username and password.');
+        return;
+      }
+
+      hideError();
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'Signing in…';
+
+      try {
+        // Try admin login first if username matches admin pattern,
+        // otherwise try client login. We always try client login;
+        // admin login is a separate action the script distinguishes.
+        let response = await auth.login(username, password);
+
+        // If client login fails, attempt admin login
+        if (!response.ok) {
+          response = await auth.adminLogin(username, password);
+        }
+
+        if (response.ok) {
+          const session = auth.getSession();
+          window.location.href = session.role === 'superadmin' ? 'admin.html' : 'app.html';
+        } else {
+          showError(response.error || 'Invalid username or password.');
+          loginBtn.disabled = false;
+          loginBtn.textContent = 'Sign In';
+        }
+      } catch (err) {
+        showError('Could not connect. Please check your internet connection.');
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Sign In';
+      }
+    }
+
+    loginBtn.addEventListener('click', handleLogin);
+
+    // Allow Enter key
+    [usernameEl, passwordEl].forEach(el => {
+      el.addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin(); });
+    });
+  });
+</script>
+</body>
+</html>

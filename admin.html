@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GST Invoice Pro — Admin Panel</title>
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar__header">
+    <div class="sidebar__logo">G</div>
+    <span class="sidebar__app-name">Admin Panel</span>
+  </div>
+  <nav class="sidebar__nav admin-nav">
+    <a data-admin-module="clients" class="active">
+      <span class="nav-icon">🏢</span>
+      <span class="nav-label">Clients</span>
+    </a>
+    <a data-admin-module="users">
+      <span class="nav-icon">👥</span>
+      <span class="nav-label">Users</span>
+    </a>
+  </nav>
+  <div class="sidebar__footer">
+    <div class="sidebar__user">
+      <div class="sidebar__user-avatar" id="adminAvatar">M</div>
+      <div>
+        <div class="sidebar__user-name" id="adminUserName">Admin</div>
+        <div class="sidebar__user-role">Super Admin</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- Main area -->
+<div class="main-area">
+  <header class="topbar">
+    <div>
+      <div class="topbar__title">Admin Panel</div>
+      <div class="topbar__subtitle">MS Associates — GST Invoice Pro</div>
+    </div>
+    <div class="topbar__right">
+      <a href="app.html" class="btn btn--outline btn--sm">← Back to App</a>
+      <button class="btn btn--outline btn--sm" id="adminLogoutBtn">⏻ Sign Out</button>
+    </div>
+  </header>
+
+  <main id="admin-content" style="padding:1.5rem;max-width:900px">
+    <div class="loading-spinner"><div class="spinner"></div> Loading…</div>
+  </main>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/api.js"></script>
+<script src="js/admin/client-manager.js"></script>
+<script src="js/admin/user-manager.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+
+  // ── Guard: superadmin only ────────────────────────────────────────────────
+  await api.refreshSession();
+  const session = auth.getSession();
+  if (!session || session.role !== 'superadmin') {
+    window.location.href = 'index.html';
+    return;
+  }
+
+  document.getElementById('adminUserName').textContent = session.userName || 'Admin';
+  document.getElementById('adminAvatar').textContent   = (session.userName||'A').slice(0,1).toUpperCase();
+
+  // ── Module loader ─────────────────────────────────────────────────────────
+  const modules = { clients: clientManager, users: userManager };
+  const container = document.getElementById('admin-content');
+
+  function loadAdminModule(name) {
+    document.querySelectorAll('.sidebar__nav a[data-admin-module]').forEach(a => {
+      a.classList.toggle('active', a.dataset.adminModule === name);
+    });
+    container.innerHTML = '<div class="loading-spinner"><div class="spinner"></div> Loading…</div>';
+    setTimeout(() => modules[name]?.render(container), 30);
+  }
+
+  document.querySelectorAll('.sidebar__nav a[data-admin-module]').forEach(a => {
+    a.addEventListener('click', e => { e.preventDefault(); loadAdminModule(a.dataset.adminModule); });
+  });
+
+  document.getElementById('adminLogoutBtn').addEventListener('click', () => {
+    if (confirm('Sign out?')) auth.logout();
+  });
+
+  // Load clients by default
+  loadAdminModule('clients');
+});
+</script>
+</body>
+</html>
