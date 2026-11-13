@@ -1,0 +1,6 @@
+/* css/admin.css */
+@import url('main.css');
+
+.admin-nav a { font-size: .85rem; }
+.admin-content { max-width: 900px; }
+.client-type-badge { font-size: .7rem; padding: .18rem .5rem; }
